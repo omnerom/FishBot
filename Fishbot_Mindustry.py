@@ -7,6 +7,9 @@ from collections import deque
 from openai import OpenAI
 import threading
 import pyperclip
+import pygame
+from pathlib import Path
+import shutil
 
 print("Starting in 3 seconds...")
 time.sleep(1)
@@ -21,14 +24,19 @@ RECENT_LINES_COUNT = 3
 CONTEXT_LINES_COUNT = 10
 
 FILE_PATH = r'C:\Users\saved\AppData\Roaming\Mindustry\last_log.txt'
-welcome_players = r'C:\Users\saved\PycharmProjects\Private-Bananabot\welcome_players'
-INSTRUCTIONS_PATH = r'C:\Users\saved\PycharmProjects\Private-Bananabot\instructions.txt'
+welcome_players = r'C:\Users\saved\PycharmProjects\FishBot\welcome_players.txt'
+INSTRUCTIONS_PATH = r'C:\Users\saved\PycharmProjects\FishBot\instructions.txt'
 API_KEY_PATH = r'C:\Users\saved\OneDrive\Documents\Python stuff\API_KEY.txt'
+AUDIO_OUTPUT_DIR = Path("tts_output")
+
+shutil.rmtree(AUDIO_OUTPUT_DIR, ignore_errors=True)
+AUDIO_OUTPUT_DIR.mkdir(exist_ok=True)
 
 with open(API_KEY_PATH, 'r', encoding='utf-8') as file:
     api_key = file.read().strip()
 
 client = OpenAI(api_key=api_key)
+pygame.mixer.init()
 
 recent_lines = deque(maxlen=RECENT_LINES_COUNT)
 context_lines = deque(maxlen=CONTEXT_LINES_COUNT)
@@ -65,6 +73,9 @@ def send_instructions():
         print(f"Instructions sent: {response}")
     except Exception as e:
         print(f"Error sending instructions: {e}")
+    pygame.mixer.music.set_volume(0.2)
+    pygame.mixer.music.load("windows-xp-startup.mp3");
+    pygame.mixer.music.play()
 
 def paste_message_from_clipboard():
     keyboard.press_and_release('enter')
@@ -73,8 +84,29 @@ def paste_message_from_clipboard():
     time.sleep(0.2)
     keyboard.press_and_release('enter')
 
+def generate_and_play_audio(text):
+    pygame.mixer.music.set_volume(1)
+    try:
+        clean_text = re.sub(r'\[[^\]]+\]', '', text)
+
+        response = client.audio.speech.create(
+            model="tts-1",
+            voice="onyx",
+            input=clean_text
+        )
+
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        audio_path = AUDIO_OUTPUT_DIR / f"response_{timestamp}.mp3"
+        response.stream_to_file(str(audio_path))
+
+        sound = pygame.mixer.Sound(str(audio_path))
+        sound.play()
+
+    except Exception as e:
+        print(f"Error in TTS: {e}")
+
 def send_message_to_chatgpt(question, context):
-    filtered_context = [line for line in context if "relevant" in line.lower()]  # Adjust filter criteria as needed
+    filtered_context = [line for line in context if "relevant" in line.lower()]
 
     messages = [{"role": "user", "content": question}]
     messages.extend({"role": "system", "content": instruction} for instruction in instructions)
@@ -99,8 +131,16 @@ def send_message_to_chatgpt(question, context):
             if len(assistant_response.split()) <= MAX_TOKENS:
                 print("R:", assistant_response)
 
+                # Generate and play TTS in a separate thread
+                threading.Thread(
+                    target=generate_and_play_audio,
+                    args=(assistant_response,),
+                    daemon=True
+                ).start()
+
                 paste_message_from_clipboard()
                 break
+
         except Exception as e:
             print(f"Error sending message: {e}")
 
@@ -139,6 +179,35 @@ def load_list_from_file(file_path):
         return []
     except Exception:
         return []
+
+def handle_miner_question(question_text):
+    global last_question, last_question_time
+
+    current_time = time.time()
+    if question_text == last_question and current_time - last_question_time < QUESTION_COOLDOWN:
+        return
+
+    last_question = question_text
+    last_question_time = current_time
+
+    print(f"Q: {question_text}")
+
+    if re.search(r'\bhey fishbot mine\b', question_text, re.IGNORECASE):
+        if re.search(r'\bhey fishbot mine (everything|all)\b', question_text, re.IGNORECASE):
+            send_message("[gold]Mining everything")
+            time.sleep(0.5)
+            send_message("!miner * 1000000")
+            return
+
+        resources = [resource for resource in valid_resources if resource in question_text.lower()]
+        if resources:
+            resource_list = ", ".join(resources)
+            send_message(f"[gold]Mining {resource_list}")
+            time.sleep(0.5)
+            send_message(f"!miner {' '.join(resources)} 1000000")
+            return
+
+    send_message_to_chatgpt(question_text, list(context_lines))
 
 def clean_chat_log(line):
     return line.replace("[I] [Chat] ", "").strip()
