@@ -75,7 +75,7 @@ class CustomAIModel:
                 model=self.model_name,
                 messages=messages,
                 max_tokens=MAX_TOKENS,
-                temperature=0.7
+                temperature=0.1
             )
             return response.choices[0].message.content.strip()
         except Exception as e:
@@ -163,8 +163,8 @@ def send_message_to_chatgpt(question, context):
     if assistant_response.lower().startswith("fishbot:"):
         assistant_response = assistant_response[len("fishbot:"):].strip()
 
-    use_color_tags = False
-    assistant_response = f"{'[#cb28fc]' if use_color_tags else ''}{assistant_response}"
+    use_color_tags = True #safe mode toggle #cb28fc
+    assistant_response = f"{'[white]' if use_color_tags else ''}{assistant_response}"
     print("R:", assistant_response)
 
     threading.Thread(
@@ -194,7 +194,7 @@ def clean_chat_log(line):
 
 def handle_chat_message(line, cleaned_line):
     global running
-    if 'hey fishbot shutdown' in cleaned_line.lower():
+    if 'hey fishbot off' in cleaned_line.lower():
         print(f"Shutdown Password: {SHUTDOWN_PASSWORD}")
     elif SHUTDOWN_PASSWORD in line:
         time.sleep(1)
