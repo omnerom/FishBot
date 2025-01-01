@@ -3,6 +3,7 @@ Timer.instance().clear();
 var filePath = "C:/Users/saved/PycharmProjects/FishBot/responses.txt";
 
 var lastLineContent = "";
+var lastMessageTime = 0;
 
 function getLastLine(filePath) {
     var file = new java.io.File(filePath);
@@ -35,10 +36,16 @@ function getLastLine(filePath) {
 function monitorFile() {
     try {
         var currentLastLine = getLastLine(filePath);
+        var currentTime = java.lang.System.currentTimeMillis();
 
-        if (currentLastLine !== lastLineContent && currentLastLine !== "") {
+        if (
+            currentLastLine !== lastLineContent &&
+            currentLastLine !== "" &&
+            currentTime - lastMessageTime >= 1000
+        ) {
             Call.sendChatMessage(currentLastLine);
             lastLineContent = currentLastLine;
+            lastMessageTime = currentTime;
         }
     } catch (e) {
         print("Error: " + e.message);
@@ -47,4 +54,4 @@ function monitorFile() {
 
 Timer.schedule(function() {
     monitorFile();
-}, 0, 0.5);
+}, 0, 0.1);

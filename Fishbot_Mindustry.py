@@ -154,7 +154,10 @@ def send_message_to_chatgpt(question, context):
 
     print(assistant_response)
 
-    cleaned_response = assistant_response.replace("<> FishBot: ", "").strip()
+    patterns_to_scrub = ["<> FishBot: ", "<> FishBot: "]
+
+    for pattern in patterns_to_scrub:
+        cleaned_response = assistant_response.replace(pattern, "").strip()
 
     try:
         with open(RESPONSES_FILE, 'r+', encoding='utf-8') as file:
