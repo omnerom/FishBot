@@ -1,15 +1,10 @@
-import keyboard
-import pyautogui
 import time
 import re
 import traceback
 from collections import deque
 from openai import OpenAI
 import threading
-import pyperclip
-import pygame
 from pathlib import Path
-import shutil
 import pyttsx3
 from queue import Queue
 import random
@@ -34,6 +29,7 @@ FILE_PATH = r'C:\Users\saved\AppData\Roaming\Mindustry\last_log.txt'
 welcome_players = r'C:\Users\saved\PycharmProjects\FishBot\welcome_players.txt'
 INSTRUCTIONS_PATH = r'C:\Users\saved\PycharmProjects\FishBot\instructions.txt'
 API_KEY_PATH = r'C:\Users\saved\OneDrive\Documents\Python stuff\API_KEY.txt'
+RESPONSES_FILE = r'C:\Users\saved\PycharmProjects\FishBot\responses.txt'
 
 tts_thread_running = True
 audio_queue = Queue()
@@ -41,10 +37,16 @@ audio_queue = Queue()
 with open(API_KEY_PATH, 'r', encoding='utf-8') as file:
     client = OpenAI(api_key=file.read().strip())
 
-pygame.mixer.init()
-
 context_lines = deque(maxlen=CONTEXT_LINES_COUNT)
 last_message_time = 0
+
+def clear_responses_file():
+    try:
+        with open(RESPONSES_FILE, 'w', encoding='utf-8') as file:
+            file.write('')
+        print("Responses file cleared")
+    except Exception as e:
+        print(f"Error clearing responses file: {e}")
 
 class CustomAIModel:
     def __init__(self, api_key, instructions_path):
@@ -65,7 +67,6 @@ class CustomAIModel:
             {"role": "user", "content": question}
         ]
 
-        # Add relevant context if available
         if context:
             context_message = {"role": "system", "content": "\n".join(context)}
             messages.insert(1, context_message)
@@ -75,7 +76,7 @@ class CustomAIModel:
                 model=self.model_name,
                 messages=messages,
                 max_tokens=MAX_TOKENS,
-                temperature=0.1
+                temperature=0.7
             )
             return response.choices[0].message.content.strip()
         except Exception as e:
@@ -92,21 +93,7 @@ def send_instructions():
     if not ai_model.base_instructions:
         print("No instructions loaded.")
         return
-
-    try:
-        print("Instructions loaded successfully")
-        pygame.mixer.music.set_volume(0.2)
-        pygame.mixer.music.load("windows-xp-startup.mp3")
-        pygame.mixer.music.play()
-    except Exception as e:
-        print(f"Error sending instructions: {e}")
-
-def paste_message_from_clipboard():
-    keyboard.press_and_release('enter')
-    time.sleep(0.2)
-    keyboard.press_and_release('ctrl+v')
-    time.sleep(0.2)
-    keyboard.press_and_release('enter')
+    print("Instructions loaded successfully")
 
 def tts_worker():
     while tts_thread_running:
@@ -114,7 +101,6 @@ def tts_worker():
             text = audio_queue.get()
             if text is None:
                 break
-            # Clear the queue of any pending messages to avoid backlog
             while not audio_queue.empty():
                 audio_queue.get()
 
@@ -163,9 +149,21 @@ def send_message_to_chatgpt(question, context):
     if assistant_response.lower().startswith("fishbot:"):
         assistant_response = assistant_response[len("fishbot:"):].strip()
 
-    use_color_tags = True #safe mode toggle #cb28fc
-    assistant_response = f"{'[white]' if use_color_tags else ''}{assistant_response}"
-    print("R:", assistant_response)
+    use_color_tags = True  # Safe mode toggle
+    assistant_response = f"{'[#23e823]' if use_color_tags else ''}{assistant_response}"
+
+    print(assistant_response)
+
+    cleaned_response = assistant_response.replace("<> FishBot: ", "").strip()
+
+    try:
+        with open(RESPONSES_FILE, 'r+', encoding='utf-8') as file:
+            existing_responses = file.read().splitlines()
+
+            if cleaned_response not in existing_responses:
+                file.write(cleaned_response + "\n")
+    except Exception as e:
+        print(f"Error logging response: {e}")
 
     threading.Thread(
         target=generate_and_play_audio,
@@ -173,9 +171,16 @@ def send_message_to_chatgpt(question, context):
         daemon=True
     ).start()
 
-    send_message_with_cooldown(assistant_response)
+    print_message_with_cooldown(assistant_response)
 
-def send_message_with_cooldown(message):
+def log_message_to_file(message):
+    try:
+        with open(RESPONSES_FILE, 'a', encoding='utf-8') as file:
+            file.write(message + "\n")
+    except Exception as e:
+        print(f"Error logging message: {e}")
+
+def print_message_with_cooldown(message):
     global last_message_time
     current_time = time.time()
 
@@ -185,8 +190,7 @@ def send_message_with_cooldown(message):
         print(f"Cooldown: Waiting {wait_time:.2f}s")
         time.sleep(wait_time)
 
-    pyperclip.copy(message)
-    paste_message_from_clipboard()
+    log_message_to_file(message)
     last_message_time = time.time()
 
 def clean_chat_log(line):
@@ -196,9 +200,11 @@ def handle_chat_message(line, cleaned_line):
     global running
     if 'hey fishbot off' in cleaned_line.lower():
         print(f"Shutdown Password: {SHUTDOWN_PASSWORD}")
-    elif SHUTDOWN_PASSWORD in line:
+        return
+
+    if SHUTDOWN_PASSWORD in line:
         time.sleep(1)
-        send_message_with_cooldown("[#f]Shutting off")
+        print_message_with_cooldown("[#f]Shutting off")
         shutdown_tts()
         running = False
 
@@ -226,7 +232,7 @@ def detect_fishbot_questions(file_path):
 
                 if (
                     fishbot_pattern.search(line)
-                    and 'hey fishbot shutdown' not in cleaned_line.lower()
+                    and 'hey fishbot off' not in cleaned_line.lower()
                     and SHUTDOWN_PASSWORD not in cleaned_line
                 ):
                     send_message_to_chatgpt(cleaned_line, list(context_lines))
@@ -234,13 +240,11 @@ def detect_fishbot_questions(file_path):
                     for welcome_player in load_list_from_file(welcome_players):
                         if welcome_player.lower() in line.lower():
                             welcome_message = f"[gold]Hello, {welcome_player}!"
-                            send_message_with_cooldown(welcome_message)
+                            print_message_with_cooldown(welcome_message)
                             break
 
             elif received_world_data_pattern.search(line):
                 print("New game detected.")
-                time.sleep(3)
-                keyboard.press_and_release('esc')
 
 def load_list_from_file(file_path):
     try:
@@ -251,10 +255,12 @@ def load_list_from_file(file_path):
 
 def main():
     try:
+        clear_responses_file()
         initialize_ai_model()
         send_instructions()
-        send_message_with_cooldown("[cyan]FishBot is online.")
-        print("Fishbot is online")
+        online_message = ("[cyan]Fishbot is online")
+        print(online_message)
+        print_message_with_cooldown(online_message)
         detect_fishbot_questions(FILE_PATH)
     except KeyboardInterrupt:
         print("Script stopped by user.")
