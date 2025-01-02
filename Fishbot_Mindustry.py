@@ -163,7 +163,7 @@ def send_message_to_chatgpt(question, context):
 
     print("R:", assistant_response)
 
-    patterns_to_scrub = ["<> FishBot: ", "<> FishBot: ", "<> FishBot: "]
+    patterns_to_scrub = ["<> FishBot: ", "<> FishBot: ", "<> FishBot: "]
     cleaned_response = assistant_response
     for pattern in patterns_to_scrub:
         cleaned_response = cleaned_response.replace(pattern, "")
