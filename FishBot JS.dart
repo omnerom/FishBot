@@ -3,8 +3,7 @@ Timer.instance().clear();
 var filePath = "C:/Users/saved/PycharmProjects/FishBot/responses.txt";
 
 var lastLineContent = "";
-var lastMessageTime = 0;
-
+var fps = 1 / 72;
 function getLastLine(filePath) {
     var file = new java.io.File(filePath);
     if (!file.exists()) {
@@ -54,4 +53,4 @@ function monitorFile() {
 
 Timer.schedule(function() {
     monitorFile();
-}, 0, 0.1);
+}, 0, fps);
