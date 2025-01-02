@@ -9,6 +9,7 @@ import pyttsx3
 from queue import Queue
 import random
 import string
+import pygame
 
 ai_model = None
 
@@ -30,6 +31,7 @@ welcome_players = r'C:\Users\saved\PycharmProjects\FishBot\welcome_players.txt'
 INSTRUCTIONS_PATH = r'C:\Users\saved\PycharmProjects\FishBot\instructions.txt'
 API_KEY_PATH = r'C:\Users\saved\OneDrive\Documents\Python stuff\API_KEY.txt'
 RESPONSES_FILE = r'C:\Users\saved\PycharmProjects\FishBot\responses.txt'
+WINDOWS_STARTUP = r'C:\Users\saved\PycharmProjects\FishBot\windows-xp-startup.mp3'
 
 tts_thread_running = True
 audio_queue = Queue()
@@ -39,6 +41,13 @@ with open(API_KEY_PATH, 'r', encoding='utf-8') as file:
 
 context_lines = deque(maxlen=CONTEXT_LINES_COUNT)
 last_message_time = 0
+
+pygame.mixer.init()
+
+def windows_startup():
+    pygame.mixer.music.set_volume(0.1)
+    pygame.mixer.music.load(WINDOWS_STARTUP)
+    pygame.mixer.music.play()
 
 def clear_responses_file():
     try:
@@ -150,14 +159,15 @@ def send_message_to_chatgpt(question, context):
         assistant_response = assistant_response[len("fishbot:"):].strip()
 
     use_color_tags = True  # Safe mode toggle
-    assistant_response = f"{'[#23e823]' if use_color_tags else ''}{assistant_response}"
+    assistant_response = f"{'[cyan]' if use_color_tags else ''}{assistant_response}"
 
-    print(assistant_response)
+    print("R:", assistant_response)
 
-    patterns_to_scrub = ["<> FishBot: ", "<> FishBot: "]
-
+    patterns_to_scrub = ["<> FishBot: ", "<> FishBot: ", "<> FishBot: "]
+    cleaned_response = assistant_response
     for pattern in patterns_to_scrub:
-        cleaned_response = assistant_response.replace(pattern, "").strip()
+        cleaned_response = cleaned_response.replace(pattern, "")
+    cleaned_response = cleaned_response.strip()
 
     try:
         with open(RESPONSES_FILE, 'r+', encoding='utf-8') as file:
@@ -176,10 +186,17 @@ def send_message_to_chatgpt(question, context):
 
     print_message_with_cooldown(assistant_response)
 
+
 def log_message_to_file(message):
     try:
+        patterns_to_scrub = ["<> FishBot: ", "<> FishBot: ", "<> FishBot: "]
+        cleaned_message = message
+        for pattern in patterns_to_scrub:
+            cleaned_message = cleaned_message.replace(pattern, "")
+        cleaned_message = cleaned_message.strip()
+
         with open(RESPONSES_FILE, 'a', encoding='utf-8') as file:
-            file.write(message + "\n")
+            file.write(cleaned_message + "\n")
     except Exception as e:
         print(f"Error logging message: {e}")
 
@@ -263,8 +280,11 @@ def main():
         clear_responses_file()
         initialize_ai_model()
         send_instructions()
+        windows_startup()
+        time.sleep(0.8)
         online_message = ("[cyan]Fishbot is online")
         print(online_message)
+        generate_and_play_audio(online_message)
         print_message_with_cooldown(online_message)
         detect_fishbot_questions(FILE_PATH)
     except KeyboardInterrupt:
