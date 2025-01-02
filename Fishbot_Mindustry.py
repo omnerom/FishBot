@@ -207,7 +207,9 @@ def handle_chat_message(line, cleaned_line):
 
     if SHUTDOWN_PASSWORD in line:
         time.sleep(1)
-        print_message_with_cooldown("[#f]Shutting off")
+        shutting_off_message = ("[#f]Shutting off")
+        print_message_with_cooldown(shutting_off_message)
+        send_message_to_chatgpt(shutting_off_message, [])
         shutdown_tts()
         running = False
 
