@@ -233,7 +233,7 @@ def handle_chat_message(line, cleaned_line):
 def detect_fishbot_questions(file_path):
     global running
     running = True
-    fishbot_pattern = re.compile(r'\bhey fishbot\b', re.IGNORECASE)
+    fishbot_pattern = re.compile(r'^hey fishbot\b', re.IGNORECASE)
     connected_pattern = re.compile(r'has connected', re.IGNORECASE)
     received_world_data_pattern = re.compile(r'Received world data', re.IGNORECASE)
 
@@ -250,15 +250,20 @@ def detect_fishbot_questions(file_path):
                 cleaned_line = clean_chat_log(line.strip())
                 context_lines.append(cleaned_line)
 
+                parts = line.split(":", 1)
+                if len(parts) > 1:
+                    message_part = parts[1].strip()
+
+                    if (
+                        fishbot_pattern.match(message_part)
+                        and 'hey fishbot off' not in message_part.lower()
+                        and SHUTDOWN_PASSWORD not in message_part
+                    ):
+                        send_message_to_chatgpt(message_part, list(context_lines))
+
                 handle_chat_message(line, cleaned_line)
 
-                if (
-                    fishbot_pattern.search(line)
-                    and 'hey fishbot off' not in cleaned_line.lower()
-                    and SHUTDOWN_PASSWORD not in cleaned_line
-                ):
-                    send_message_to_chatgpt(cleaned_line, list(context_lines))
-                elif connected_pattern.search(line):
+                if connected_pattern.search(line):
                     for welcome_player in load_list_from_file(welcome_players):
                         if welcome_player.lower() in line.lower():
                             welcome_message = f"[gold]Hello, {welcome_player}!"
