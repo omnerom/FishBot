@@ -158,7 +158,7 @@ def send_message_to_chatgpt(question, context):
     if assistant_response.lower().startswith("fishbot:"):
         assistant_response = assistant_response[len("fishbot:"):].strip()
 
-    use_color_tags = True  # Safe mode toggle
+    use_color_tags = True  #ignore
     assistant_response = f"{'[cyan]' if use_color_tags else ''}{assistant_response}"
 
     print("R:", assistant_response)
