@@ -1,4 +1,0 @@
-*.py filter=ignorelines
-git config --global filter.ignorelines.clean "sed '/#ignore$/d'"
-
-git config --global filter.ignorelines.smudge cat
