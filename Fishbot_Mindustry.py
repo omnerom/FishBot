@@ -26,7 +26,7 @@ MAX_TOKENS = 30
 MESSAGE_COOLDOWN = 1
 CONTEXT_LINES_COUNT = 10
 
-FILE_PATH = r'C:\Users\saved\AppData\Roaming\Mindustry\last_log.txt'
+LOG_PATH = r'C:\Users\saved\AppData\Roaming\Mindustry\last_log.txt'
 welcome_players = r'C:\Users\saved\PycharmProjects\FishBot\welcome_players.txt'
 INSTRUCTIONS_PATH = r'C:\Users\saved\PycharmProjects\FishBot\instructions.txt'
 API_KEY_PATH = r'C:\Users\saved\OneDrive\Documents\Python stuff\API_KEY.txt'
@@ -43,11 +43,6 @@ context_lines = deque(maxlen=CONTEXT_LINES_COUNT)
 last_message_time = 0
 
 pygame.mixer.init()
-
-def windows_startup():
-    pygame.mixer.music.set_volume(0.1)
-    pygame.mixer.music.load(WINDOWS_STARTUP)
-    pygame.mixer.music.play()
 
 def clear_responses_file():
     try:
@@ -158,7 +153,7 @@ def send_message_to_chatgpt(question, context):
     if assistant_response.lower().startswith("fishbot:"):
         assistant_response = assistant_response[len("fishbot:"):].strip()
 
-    use_color_tags = True  #ignore
+    use_color_tags = True  #safe mode toggle
     assistant_response = f"{'[cyan]' if use_color_tags else ''}{assistant_response}"
 
     print("R:", assistant_response)
@@ -280,18 +275,23 @@ def load_list_from_file(file_path):
     except (FileNotFoundError, Exception):
         return []
 
+def startup():
+    online_message = ("[cyan] FishBot is online")
+    clear_responses_file()
+    initialize_ai_model()
+    send_instructions()
+    pygame.mixer.music.set_volume(0.2)
+    pygame.mixer.music.load(WINDOWS_STARTUP)
+    pygame.mixer.music.play()
+    time.sleep(1)
+    print(online_message)
+    generate_and_play_audio(online_message)
+    print_message_with_cooldown(online_message)
+
 def main():
     try:
-        clear_responses_file()
-        initialize_ai_model()
-        send_instructions()
-        windows_startup()
-        time.sleep(0.8)
-        online_message = ("[cyan]Fishbot is online")
-        print(online_message)
-        generate_and_play_audio(online_message)
-        print_message_with_cooldown(online_message)
-        detect_fishbot_questions(FILE_PATH)
+        startup()
+        detect_fishbot_questions(LOG_PATH)
     except KeyboardInterrupt:
         print("Script stopped by user.")
 
