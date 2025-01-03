@@ -1,7 +1,6 @@
 Timer.instance().clear();
-
 var filePath = "C:/Users/saved/PycharmProjects/FishBot/responses.txt";
-
+var lastMessageTime = 0;
 var lastLineContent = "";
 var fps = 1 / 72;
 function getLastLine(filePath) {
