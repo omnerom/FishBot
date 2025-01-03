@@ -1,15 +1,18 @@
 import time
 import re
 import traceback
-from collections import deque
-from openai import OpenAI
 import threading
-from pathlib import Path
-import pyttsx3
-from queue import Queue
+import io
+import tempfile
+import os
 import random
 import string
 import pygame
+from collections import deque
+from openai import OpenAI
+from pathlib import Path
+from queue import Queue
+from gtts import gTTS
 
 ai_model = None
 
@@ -99,55 +102,7 @@ def send_instructions():
         return
     print("Instructions loaded successfully")
 
-def tts_worker():
-    while tts_thread_running:
-        try:
-            text = audio_queue.get()
-            if text is None:
-                break
-            while not audio_queue.empty():
-                audio_queue.get()
-
-            engine = pyttsx3.init()
-            engine.setProperty('rate', 150)
-            engine.setProperty('volume', 1.0)
-            voices = engine.getProperty('voices')
-            engine.setProperty('voice', voices[1].id)
-
-            engine.say(text)
-            engine.runAndWait()
-            engine.stop()
-        except Exception as e:
-            print(f"Error in TTS worker: {e}")
-        finally:
-            try:
-                engine.stop()
-            except:
-                pass
-
-tts_thread = threading.Thread(target=tts_worker, daemon=True)
-tts_thread.start()
-
-def generate_and_play_audio(text):
-    try:
-        clean_text = re.sub(r'\[[^\]]+\]', '', text)
-        while not audio_queue.empty():
-            audio_queue.get()
-        audio_queue.put(clean_text)
-    except Exception as e:
-        print(f"Error in TTS: {e}")
-
-def shutdown_tts():
-    global tts_thread_running
-    tts_thread_running = False
-    while not audio_queue.empty():
-        audio_queue.get()
-    audio_queue.put(None)
-    tts_thread.join(timeout=2)
-
 def send_message_to_chatgpt(question, context):
-    print(f"Q: {question}")
-
     assistant_response = ai_model.get_response(question, context)
 
     if assistant_response.lower().startswith("fishbot:"):
@@ -181,10 +136,9 @@ def send_message_to_chatgpt(question, context):
 
     print_message_with_cooldown(assistant_response)
 
-
 def log_message_to_file(message):
     try:
-        patterns_to_scrub = ["<> FishBot: ", "<> FishBot: ", "<> FishBot: "]
+        patterns_to_scrub = ["<> FishBot: ", "<> FishBot: ", "<> FishBot: "]
         cleaned_message = message
         for pattern in patterns_to_scrub:
             cleaned_message = cleaned_message.replace(pattern, "")
@@ -254,6 +208,8 @@ def detect_fishbot_questions(file_path):
                         and 'hey fishbot off' not in message_part.lower()
                         and SHUTDOWN_PASSWORD not in message_part
                     ):
+                        question = line.replace("[I] [Chat] ", "").strip()
+                        print(f"Q: {question}")
                         send_message_to_chatgpt(message_part, list(context_lines))
 
                 handle_chat_message(line, cleaned_line)
@@ -285,7 +241,6 @@ def startup():
     pygame.mixer.music.play()
     time.sleep(1)
     print(online_message)
-    generate_and_play_audio(online_message)
     print_message_with_cooldown(online_message)
 
 def main():
